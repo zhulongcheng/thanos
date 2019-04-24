@@ -23,6 +23,13 @@ import (
 	"github.com/prometheus/tsdb/labels"
 )
 
+var (
+	zeroDur         = time.Duration(0)
+	maxTime         = time.Unix(1<<63-1, 0)
+	minTimeDuration = &TimeOrDurationValue{dur: &zeroDur}
+	maxTimeDuration = &TimeOrDurationValue{t: &maxTime}
+)
+
 type storeSuite struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -88,7 +95,7 @@ func prepareStoreWithTestBlocks(t testing.TB, dir string, bkt objstore.Bucket, m
 		testutil.Ok(t, os.RemoveAll(dir2))
 	}
 
-	store, err := NewBucketStore(log.NewLogfmtLogger(os.Stderr), nil, bkt, dir, 100, 0, maxSampleCount, 20, false, 20)
+	store, err := NewBucketStore(log.NewLogfmtLogger(os.Stderr), nil, bkt, dir, 100, 0, maxSampleCount, 20, false, 20, minTimeDuration, maxTimeDuration)
 	testutil.Ok(t, err)
 
 	s.store = store

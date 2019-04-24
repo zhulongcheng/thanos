@@ -202,6 +202,9 @@ type BucketStore struct {
 	// samplesLimiter limits the number of samples per each Series() call.
 	samplesLimiter *Limiter
 	partitioner    partitioner
+
+	minTime *TimeOrDurationValue
+	maxTime *TimeOrDurationValue
 }
 
 // NewBucketStore creates a new bucket backed store that implements the store API against
@@ -217,6 +220,8 @@ func NewBucketStore(
 	maxConcurrent int,
 	debugLogging bool,
 	blockSyncConcurrency int,
+	minTime *TimeOrDurationValue,
+	maxTime *TimeOrDurationValue,
 ) (*BucketStore, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
@@ -247,6 +252,7 @@ func NewBucketStore(
 	metrics := newBucketStoreMetrics(reg)
 	s := &BucketStore{
 		logger:               logger,
+		metrics:              metrics,
 		bucket:               bucket,
 		dir:                  dir,
 		indexCache:           indexCache,
@@ -261,8 +267,9 @@ func NewBucketStore(
 		),
 		samplesLimiter: NewLimiter(maxSampleCount, metrics.queriesDropped),
 		partitioner:    gapBasedPartitioner{maxGapSize: maxGapSize},
+		minTime:        minTime,
+		maxTime:        maxTime,
 	}
-	s.metrics = metrics
 
 	if err := os.MkdirAll(dir, 0777); err != nil {
 		return nil, errors.Wrap(err, "create dir")
@@ -414,6 +421,12 @@ func (s *BucketStore) addBlock(ctx context.Context, id ulid.ULID) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "new bucket block")
 	}
+
+	// We check for blocks in configured minTime, maxTime range
+	if b.meta.MinTime < s.minTime.PrometheusTimestamp() || b.meta.MinTime > s.maxTime.PrometheusTimestamp() {
+		return nil
+	}
+
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
