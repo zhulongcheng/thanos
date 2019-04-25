@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	zeroDur         = time.Duration(0)
+	minTime         = time.Unix(0, 0)
 	maxTime         = time.Unix(1<<63-1, 0)
-	minTimeDuration = &TimeOrDurationValue{dur: &zeroDur}
+	minTimeDuration = &TimeOrDurationValue{t: &minTime}
 	maxTimeDuration = &TimeOrDurationValue{t: &maxTime}
 )
 
