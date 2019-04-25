@@ -18,7 +18,6 @@ import (
 	"syscall"
 
 	gmetrics "github.com/armon/go-metrics"
-
 	gprom "github.com/armon/go-metrics/prometheus"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
