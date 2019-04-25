@@ -25,7 +25,7 @@ import (
 
 var (
 	minTime         = time.Unix(0, 0)
-	maxTime         = time.Unix(1<<63-1, 0)
+	maxTime, _      = time.Parse(time.RFC3339, "9999-12-31T23:59:59Z")
 	minTimeDuration = &TimeOrDurationValue{t: &minTime}
 	maxTimeDuration = &TimeOrDurationValue{t: &maxTime}
 )
