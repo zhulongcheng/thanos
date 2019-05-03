@@ -288,7 +288,7 @@ func TestBucketStore_Info(t *testing.T) {
 	dir, err := ioutil.TempDir("", "prometheus-test")
 	testutil.Ok(t, err)
 
-	bucketStore, err := NewBucketStore(nil, nil, nil, dir, 2e5, 2e5, 0, 0, false, 20, minTimeDuration, maxTimeDuration)
+	bucketStore, err := NewBucketStore(nil, nil, nil, dir, noopCache{}, 2e5, 0, 0, false, 20, minTimeDuration, maxTimeDuration)
 	testutil.Ok(t, err)
 
 	resp, err := bucketStore.Info(ctx, &storepb.InfoRequest{})
