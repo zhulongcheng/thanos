@@ -11,6 +11,11 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
+
+### Added
+
+- [#1077](https://github.com/improbable-eng/thanos/pull/1077) Thanos Store gateway now supports time & duration based partitioning using `--min-time` & `--max-time` flags. Flags can be set to constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.
+
 ## [v0.4.0-rc.1](https://github.com/improbable-eng/thanos/releases/tag/v0.4.0-rc.1) - 2019.04.26
 
 :warning: **IMPORTANT** :warning: This is the last release that supports gossip. From Thanos v0.5.0, gossip will be completely removed.
