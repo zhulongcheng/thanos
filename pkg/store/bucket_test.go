@@ -12,11 +12,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/improbable-eng/thanos/pkg/block/metadata"
 	"github.com/improbable-eng/thanos/pkg/compact/downsample"
+	"github.com/improbable-eng/thanos/pkg/model"
 	"github.com/improbable-eng/thanos/pkg/objstore/inmem"
 	"github.com/improbable-eng/thanos/pkg/store/storepb"
 	"github.com/improbable-eng/thanos/pkg/testutil"
 	"github.com/oklog/ulid"
-	"github.com/prometheus/common/model"
+	prommodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/tsdb/labels"
 )
@@ -332,9 +333,9 @@ func TestBucketStore_isBlockInMinMaxRange(t *testing.T) {
 
 	// Run actual test
 	zeroTime := time.Unix(0, 0)
-	hourBefore := model.Duration(-1 * time.Hour)
-	minTime := &TimeOrDurationValue{t: &zeroTime}
-	maxTime := &TimeOrDurationValue{dur: &hourBefore}
+	hourBefore := prommodel.Duration(-1 * time.Hour)
+	minTime := &model.TimeOrDurationValue{Time: &zeroTime}
+	maxTime := &model.TimeOrDurationValue{Dur: &hourBefore}
 
 	// bucketStore accepts blocks in range [0, now-1h]
 	bucketStore, err := NewBucketStore(nil, nil, inmem.NewBucket(), dir, noopCache{}, 0, 0, 20, false, 20,

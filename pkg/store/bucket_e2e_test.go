@@ -14,6 +14,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/improbable-eng/thanos/pkg/block"
 	"github.com/improbable-eng/thanos/pkg/block/metadata"
+	"github.com/improbable-eng/thanos/pkg/model"
 	"github.com/improbable-eng/thanos/pkg/objstore"
 	"github.com/improbable-eng/thanos/pkg/objstore/objtesting"
 	"github.com/improbable-eng/thanos/pkg/runutil"
@@ -28,8 +29,8 @@ import (
 var (
 	minTime         = time.Unix(0, 0)
 	maxTime, _      = time.Parse(time.RFC3339, "9999-12-31T23:59:59Z")
-	minTimeDuration = &TimeOrDurationValue{t: &minTime}
-	maxTimeDuration = &TimeOrDurationValue{t: &maxTime}
+	minTimeDuration = &model.TimeOrDurationValue{Time: &minTime}
+	maxTimeDuration = &model.TimeOrDurationValue{Time: &maxTime}
 )
 
 type noopCache struct{}

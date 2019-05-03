@@ -23,6 +23,7 @@ import (
 	"github.com/improbable-eng/thanos/pkg/compact/downsample"
 	"github.com/improbable-eng/thanos/pkg/component"
 	"github.com/improbable-eng/thanos/pkg/extprom"
+	"github.com/improbable-eng/thanos/pkg/model"
 	"github.com/improbable-eng/thanos/pkg/objstore"
 	"github.com/improbable-eng/thanos/pkg/pool"
 	"github.com/improbable-eng/thanos/pkg/runutil"
@@ -209,8 +210,8 @@ type BucketStore struct {
 	samplesLimiter *Limiter
 	partitioner    partitioner
 
-	minTime *TimeOrDurationValue
-	maxTime *TimeOrDurationValue
+	minTime *model.TimeOrDurationValue
+	maxTime *model.TimeOrDurationValue
 }
 
 // NewBucketStore creates a new bucket backed store that implements the store API against
@@ -226,8 +227,8 @@ func NewBucketStore(
 	maxConcurrent int,
 	debugLogging bool,
 	blockSyncConcurrency int,
-	minTime *TimeOrDurationValue,
-	maxTime *TimeOrDurationValue,
+	minTime *model.TimeOrDurationValue,
+	maxTime *model.TimeOrDurationValue,
 ) (*BucketStore, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
