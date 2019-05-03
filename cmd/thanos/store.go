@@ -63,7 +63,7 @@ func registerStore(m map[string]setupFunc, app *kingpin.Application, name string
 			return errors.Wrap(err, "new cluster peer")
 		}
 
-		// Sanity check minTime
+		// Sanity check minTime.
 		if minTime.PrometheusTimestamp() > maxTime.PrometheusTimestamp() {
 			return errors.Errorf("invalid argument: min-time '%s' can't be greater than max-time '%s'", minTime, maxTime)
 		}
