@@ -11,12 +11,11 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
-
 ### Added
 
 - [#1077](https://github.com/improbable-eng/thanos/pull/1077) Thanos Store gateway now supports time & duration based partitioning using `--min-time` & `--max-time` flags. Flags can be set to constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.
 
-## [v0.4.0-rc.1](https://github.com/improbable-eng/thanos/releases/tag/v0.4.0-rc.1) - 2019.04.26
+## [v0.4.0](https://github.com/improbable-eng/thanos/releases/tag/v0.4.0) - 2019.05.3
 
 :warning: **IMPORTANT** :warning: This is the last release that supports gossip. From Thanos v0.5.0, gossip will be completely removed.
 
@@ -25,6 +24,8 @@ See [this](docs/proposals/approved/201809_gossip-removal.md) for more details.
 
 ### Added
 
+- [thanos.io](https://thanos.io) website & automation :tada: 
+- [#1053](https://github.com/improbable-eng/thanos/pull/1053) compactor: Compactor & store gateway now handles incomplete uploads gracefully. Added hard limit on how long block upload can take (30m).
 - [#811](https://github.com/improbable-eng/thanos/pull/811) Remote write receiver component :heart: :heart: thanks to RedHat (@brancz) contribution.
 - [#910](https://github.com/improbable-eng/thanos/pull/910) Query's stores UI page is now sorted by type and old DNS or File SD stores are removed after 5 minutes (configurable via the new `--store.unhealthy-timeout=5m` flag).
 - [#905](https://github.com/improbable-eng/thanos/pull/905) Thanos support for Query API: /api/v1/labels. Notice that the API was added in Prometheus v2.6.
@@ -84,7 +85,7 @@ Note that this is required to have SRV resolution working on [Golang 1.11+ with 
     * Added `thanos_rule_evaluation_with_warnings_total` to Ruler.
     * DNS `thanos_ruler_query_apis*` are now `thanos_ruler_query_apis_*` for consistency.
     * DNS `thanos_querier_store_apis*` are now `thanos_querier_store_apis__*` for consistency.
-    * Query Gate `thanos_bucket_store_series*` are now `thanos_bucket_store_series___*` for consistency.
+    * Query Gate `thanos_bucket_store_series*` are now `thanos_bucket_store_series_*` for consistency.
     * Most of thanos ruler metris related to rule manager has `strategy` label.
   
   Ruler tracing spans:
@@ -105,13 +106,15 @@ Note that this is required to have SRV resolution working on [Golang 1.11+ with 
      * [BUGFIX] Fix sorting of rule groups. #5260
    * store: [ENHANCEMENT] Fast path for EmptyPostings cases in Merge, Intersect and Without.
    * tooling: [FEATURE] New dump command to tsdb tool to dump all samples.
-   * compactor: [ENHANCEMENT] When closing the db any running compaction will be cancelled so it doesn't block.
+   * compactor: 
+      * [ENHANCEMENT] When closing the db any running compaction will be cancelled so it doesn't block.
+      * [CHANGE] Renamed flag `--sync-delay` to `--consistency-delay` [#1053](https://github.com/improbable-eng/thanos/pull/1053)
   
   For ruler essentially whole TSDB CHANGELOG applies beween v0.4.0-v0.6.1: https://github.com/prometheus/tsdb/blob/master/CHANGELOG.md
   
   Note that this was added on TSDB and Prometheus: [FEATURE] Time-ovelapping blocks are now allowed. #370
   Whoever due to nature of Thanos compaction (distributed systems), for safety reason this is disabled for Thanos compactor for now.
- 
+
 - [#868](https://github.com/improbable-eng/thanos/pull/868) Go has been updated to 1.12.
 - [#1055](https://github.com/improbable-eng/thanos/pull/1055) Gossip flags are now disabled by default and deprecated. 
 - [#964](https://github.com/improbable-eng/thanos/pull/964) repair: Repair process now sorts the series and labels within block.
