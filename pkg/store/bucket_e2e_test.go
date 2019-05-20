@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oklog/ulid"
-
 	"github.com/go-kit/kit/log"
 	"github.com/improbable-eng/thanos/pkg/block"
 	"github.com/improbable-eng/thanos/pkg/block/metadata"
@@ -21,6 +19,7 @@ import (
 	storecache "github.com/improbable-eng/thanos/pkg/store/cache"
 	"github.com/improbable-eng/thanos/pkg/store/storepb"
 	"github.com/improbable-eng/thanos/pkg/testutil"
+	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/tsdb/labels"
@@ -29,8 +28,14 @@ import (
 var (
 	minTime         = time.Unix(0, 0)
 	maxTime, _      = time.Parse(time.RFC3339, "9999-12-31T23:59:59Z")
-	minTimeDuration = &model.TimeOrDurationValue{Time: &minTime}
-	maxTimeDuration = &model.TimeOrDurationValue{Time: &maxTime}
+	minTimeDuration = model.TimeOrDurationValue{Time: &minTime}
+	maxTimeDuration = model.TimeOrDurationValue{Time: &maxTime}
+	blockFilterConf = &BlockFilterConfig{
+		MinBlockStartTime: minTimeDuration,
+		MaxBlockStartTime: maxTimeDuration,
+		MinBlockEndTime:   minTimeDuration,
+		MaxBlockEndTime:   maxTimeDuration,
+	}
 )
 
 type noopCache struct{}
@@ -136,7 +141,7 @@ func prepareStoreWithTestBlocks(t testing.TB, dir string, bkt objstore.Bucket, m
 		testutil.Ok(t, os.RemoveAll(dir2))
 	}
 
-	store, err := NewBucketStore(s.logger, nil, bkt, dir, s.cache, 0, maxSampleCount, 20, false, 20, minTimeDuration, maxTimeDuration)
+	store, err := NewBucketStore(s.logger, nil, bkt, dir, s.cache, 0, maxSampleCount, 20, false, 20, blockFilterConf)
 	testutil.Ok(t, err)
 
 	s.store = store
