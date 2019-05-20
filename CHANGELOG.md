@@ -13,7 +13,7 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ### Added
 
-- [#1077](https://github.com/improbable-eng/thanos/pull/1077) Thanos Store gateway now supports time & duration based partitioning using `--min-time` & `--max-time` flags. Flags can be set to constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.
+- [#1077](https://github.com/improbable-eng/thanos/pull/1077) Thanos Store gateway now supports time & duration based partitioning using `--min-block-start-time` & `--max-block-start-time` flags. Flags can be set to constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y. Checkout Store documentation for more info.
 - [#1094](https://github.com/improbable-eng/thanos/pull/1094) Allow configuring the response header timeout for the S3 client.
 
 ### Changed
