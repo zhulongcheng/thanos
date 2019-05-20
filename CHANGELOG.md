@@ -14,6 +14,24 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 ### Added
 
 - [#1077](https://github.com/improbable-eng/thanos/pull/1077) Thanos Store gateway now supports time & duration based partitioning using `--min-time` & `--max-time` flags. Flags can be set to constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.
+- [#1094](https://github.com/improbable-eng/thanos/pull/1094) Allow configuring the response header timeout for the S3 client.
+
+### Changed
+
+- [#1066](https://github.com/improbable-eng/thanos/pull/1066) Upgrade Thanos ui to Prometheus v2.9.1.
+
+  Changes from the upstream:
+  * query:
+    - [ENHANCEMENT] Update moment.js and moment-timezone.js [PR #4679](https://github.com/prometheus/prometheus/pull/4679)
+    - [ENHANCEMENT] Support to query elements by a specific time [PR #4764](https://github.com/prometheus/prometheus/pull/4764)
+    - [ENHANCEMENT] Update to Bootstrap 4.1.3 [PR #5192](https://github.com/prometheus/prometheus/pull/5192)
+    - [BUGFIX] Limit number of merics in prometheus UI [PR #5139](https://github.com/prometheus/prometheus/pull/5139)
+    - [BUGFIX] Web interface Quality of Life improvements [PR #5201](https://github.com/prometheus/prometheus/pull/5201)
+  * rule:
+    - [ENHANCEMENT] Improve rule views by wrapping lines [PR #4702](https://github.com/prometheus/prometheus/pull/4702)
+    - [ENHANCEMENT] Show rule evaluation errors on rules page [PR #4457](https://github.com/prometheus/prometheus/pull/4457)
+    
+- [#1156](https://github.com/improbable-eng/thanos/pull/1156) Moved CI and docker multistage to Golang 1.12.5 for latest mem alloc improvements. 
 
 ## [v0.4.0](https://github.com/improbable-eng/thanos/releases/tag/v0.4.0) - 2019.05.3
 
