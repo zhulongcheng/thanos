@@ -55,7 +55,7 @@ func registerStore(m map[string]setupFunc, app *kingpin.Application, name string
 	minBlockStartTime := model.TimeOrDuration(cmd.Flag("min-block-start-time", "Start of time range limit to serve. Thanos Store serves only blocks, which have start time greater than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
 		Default("0000-01-01T00:00:00Z"))
 
-	maxBlockStartTime := model.TimeOrDuration(cmd.Flag("--max-block-start-time", "End of time range limit to serve. Thanos Store serves only blocks, which have start time is less than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
+	maxBlockStartTime := model.TimeOrDuration(cmd.Flag("max-block-start-time", "End of time range limit to serve. Thanos Store serves only blocks, which have start time is less than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
 		Default("9999-12-31T23:59:59Z"))
 
 	minBlockEndTime := model.TimeOrDuration(cmd.Flag("min-block-end-time", "Start of time range limit to serve. Thanos Store serves only blocks, which have end time greater than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1.5d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
