@@ -12,7 +12,13 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strings"
 	"sync"
+
+	opentracing "github.com/opentracing/opentracing-go"
+
+	"github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/storage/remote"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -20,7 +26,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/improbable-eng/thanos/pkg/component"
 	"github.com/improbable-eng/thanos/pkg/runutil"
-	"github.com/improbable-eng/thanos/pkg/store/prompb"
 	"github.com/improbable-eng/thanos/pkg/store/storepb"
 	"github.com/improbable-eng/thanos/pkg/tracing"
 	"github.com/pkg/errors"
@@ -124,12 +129,12 @@ func (p *PrometheusStore) Series(r *storepb.SeriesRequest, s storepb.Store_Serie
 	if !match {
 		return nil
 	}
-	q := prompb.Query{StartTimestampMs: r.MinTime, EndTimestampMs: r.MaxTime}
+	q := &prompb.Query{StartTimestampMs: r.MinTime, EndTimestampMs: r.MaxTime}
 
 	// TODO(fabxc): import common definitions from prompb once we have a stable gRPC
 	// query API there.
 	for _, m := range newMatchers {
-		pm := prompb.LabelMatcher{Name: m.Name, Value: m.Value}
+		pm := &prompb.LabelMatcher{Name: m.Name, Value: m.Value}
 
 		switch m.Type {
 		case storepb.LabelMatcher_EQ:
@@ -146,12 +151,105 @@ func (p *PrometheusStore) Series(r *storepb.SeriesRequest, s storepb.Store_Serie
 		q.Matchers = append(q.Matchers, pm)
 	}
 
-	resp, err := p.promSeries(s.Context(), q)
+	queryPrometheusSpan, ctx := tracing.StartSpan(s.Context(), "query_prometheus")
+
+	httpResp, err := p.startPromSeries(ctx, q)
 	if err != nil {
+		queryPrometheusSpan.Finish()
 		return errors.Wrap(err, "query Prometheus")
 	}
 
-	span, _ := tracing.StartSpan(s.Context(), "transform_and_respond")
+	// Negotiate content. We requested streamed chunked response type, but still we need to support old versions of
+	// remote read.
+	contentType := httpResp.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "application/x-protobuf;") {
+		return p.handleSampledPromethuesResponse(s, httpResp, queryPrometheusSpan, ext)
+	}
+
+	if !strings.HasPrefix(contentType, "application/x-streamed-protobuf; proto=prometheus.ChunkedReadResponse") {
+		return errors.Errorf("not supported remote read content type: %s", contentType)
+	}
+
+	level.Debug(p.logger).Log("msg", "started handling ReadRequest_STREAMED_XOR_CHUNKS streamed read response.")
+
+	framesNum := 0
+	seriesNum := 0
+
+	defer func() {
+		queryPrometheusSpan.SetTag("frames", framesNum)
+		queryPrometheusSpan.SetTag("series", seriesNum)
+		queryPrometheusSpan.Finish()
+	}()
+	defer runutil.CloseWithLogOnErr(p.logger, httpResp.Body, "prom series request body")
+
+	lastSeries := ""
+	stream := remote.NewChunkedReader(httpResp.Body)
+	for {
+		res := &prompb.ChunkedReadResponse{}
+		err := stream.NextProto(res)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errors.Wrap(err, "next proto")
+		}
+
+		if len(res.ChunkedSeries) != 1 {
+			level.Warn(p.logger).Log("msg", "Prometheus ReadRequest_STREAMED_XOR_CHUNKS returned non 1 series in frame", "series", len(res.ChunkedSeries))
+		}
+
+		framesNum++
+		for _, series := range res.ChunkedSeries {
+			hash := func() string {
+				var m []string
+				for _, l := range series.Labels {
+					m = append(m, l.String())
+				}
+				return strings.Join(m, ";")
+			}()
+			if hash != lastSeries {
+				seriesNum++
+				lastSeries = hash
+			}
+
+			thanosChks := make([]storepb.AggrChunk, len(series.Chunks))
+
+			for i, chk := range series.Chunks {
+				thanosChks[i] = storepb.AggrChunk{
+					MaxTime: chk.MaxTimeMs,
+					MinTime: chk.MinTimeMs,
+					Raw: &storepb.Chunk{
+						Data: chk.Data,
+						Type: storepb.Chunk_Encoding(chk.Type - 1),
+					},
+				}
+				series.Chunks[i].Data = nil
+			}
+
+			if err := s.Send(storepb.NewSeriesResponse(&storepb.Series{
+				Labels: p.translateAndExtendLabels(series.Labels, ext),
+				Chunks: thanosChks,
+			})); err != nil {
+				return err
+			}
+		}
+	}
+	level.Debug(p.logger).Log("msg", "handled ReadRequest_STREAMED_XOR_CHUNKS request.", "frames", framesNum, "series", seriesNum)
+	return nil
+}
+
+func (p *PrometheusStore) handleSampledPromethuesResponse(s storepb.Store_SeriesServer, httpResp *http.Response, querySpan opentracing.Span, ext labels.Labels) error {
+	ctx := s.Context()
+
+	level.Debug(p.logger).Log("msg", "started handling SAMPLED response type. Inefficient but the only present.")
+
+	resp, err := p.fetchSampledResponse(ctx, httpResp)
+	querySpan.Finish()
+	if err != nil {
+		return err
+	}
+
+	span, _ := tracing.StartSpan(ctx, "transform_and_respond")
 	defer span.Finish()
 	span.SetTag("series_count", len(resp.Results[0].Timeseries))
 
@@ -179,18 +277,48 @@ func (p *PrometheusStore) Series(r *storepb.SeriesRequest, s storepb.Store_Serie
 			return err
 		}
 
-		resp := storepb.NewSeriesResponse(&storepb.Series{
+		if err := s.Send(storepb.NewSeriesResponse(&storepb.Series{
 			Labels: lset,
 			Chunks: aggregatedChunks,
-		})
-		if err := s.Send(resp); err != nil {
+		})); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *PrometheusStore) chunkSamples(series prompb.TimeSeries, maxSamplesPerChunk int) (chks []storepb.AggrChunk, err error) {
+func (p *PrometheusStore) fetchSampledResponse(ctx context.Context, resp *http.Response) (*prompb.ReadResponse, error) {
+	defer runutil.CloseWithLogOnErr(p.logger, resp.Body, "prom series request body")
+
+	buf := bytes.NewBuffer(p.getBuffer())
+	defer func() {
+		p.putBuffer(buf.Bytes())
+	}()
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return nil, errors.Wrap(err, "copy response")
+	}
+	spanSnappyDecode, ctx := tracing.StartSpan(ctx, "decompress_response")
+	decomp, err := snappy.Decode(p.getBuffer(), buf.Bytes())
+	spanSnappyDecode.Finish()
+	defer p.putBuffer(decomp)
+	if err != nil {
+		return nil, errors.Wrap(err, "decompress response")
+	}
+
+	var data prompb.ReadResponse
+	spanUnmarshal, ctx := tracing.StartSpan(ctx, "unmarshal_response")
+	if err := proto.Unmarshal(decomp, &data); err != nil {
+		return nil, errors.Wrap(err, "unmarshal response")
+	}
+	spanUnmarshal.Finish()
+	if len(data.Results) != 1 {
+		return nil, errors.Errorf("unexpected result size %d", len(data.Results))
+	}
+
+	return &data, nil
+}
+
+func (p *PrometheusStore) chunkSamples(series *prompb.TimeSeries, maxSamplesPerChunk int) (chks []storepb.AggrChunk, err error) {
 	samples := series.Samples
 
 	for len(samples) > 0 {
@@ -216,11 +344,11 @@ func (p *PrometheusStore) chunkSamples(series prompb.TimeSeries, maxSamplesPerCh
 	return chks, nil
 }
 
-func (p *PrometheusStore) promSeries(ctx context.Context, q prompb.Query) (*prompb.ReadResponse, error) {
-	span, ctx := tracing.StartSpan(ctx, "query_prometheus")
-	defer span.Finish()
-
-	reqb, err := proto.Marshal(&prompb.ReadRequest{Queries: []prompb.Query{q}})
+func (p *PrometheusStore) startPromSeries(ctx context.Context, q *prompb.Query) (*http.Response, error) {
+	reqb, err := proto.Marshal(&prompb.ReadRequest{
+		Queries:               []*prompb.Query{q},
+		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal read request")
 	}
@@ -233,8 +361,8 @@ func (p *PrometheusStore) promSeries(ctx context.Context, q prompb.Query) (*prom
 		return nil, errors.Wrap(err, "unable to create request")
 	}
 	preq.Header.Add("Content-Encoding", "snappy")
-	preq.Header.Set("Content-Type", "application/x-protobuf")
-	preq.Header.Set("X-Prometheus-Remote-Read-Version", "0.1.0")
+	preq.Header.Set("Content-Type", "application/x-stream-protobuf")
+	preq.Header.Set("X-Prometheus-Remote-Read-Version", "0.2.0")
 	spanReqDo, ctx := tracing.StartSpan(ctx, "query_prometheus_request")
 	preq = preq.WithContext(ctx)
 	presp, err := p.client.Do(preq)
@@ -242,37 +370,18 @@ func (p *PrometheusStore) promSeries(ctx context.Context, q prompb.Query) (*prom
 		return nil, errors.Wrap(err, "send request")
 	}
 	spanReqDo.Finish()
-	defer runutil.CloseWithLogOnErr(p.logger, presp.Body, "prom series request body")
 
 	if presp.StatusCode/100 != 2 {
-		return nil, errors.Errorf("request failed with code %s", presp.Status)
+		// Best effort read.
+		b, err := ioutil.ReadAll(presp.Body)
+		if err != nil {
+			level.Error(p.logger).Log("msg", "failed to read response from non 2XX remote read request", "err", err)
+		}
+		_= presp.Body.Close()
+		return nil, errors.Errorf("request failed with code %s; msg %s", presp.Status, string(b))
 	}
 
-	buf := bytes.NewBuffer(p.getBuffer())
-	defer func() {
-		p.putBuffer(buf.Bytes())
-	}()
-	if _, err := io.Copy(buf, presp.Body); err != nil {
-		return nil, errors.Wrap(err, "copy response")
-	}
-	spanSnappyDecode, ctx := tracing.StartSpan(ctx, "decompress_response")
-	decomp, err := snappy.Decode(p.getBuffer(), buf.Bytes())
-	spanSnappyDecode.Finish()
-	defer p.putBuffer(decomp)
-	if err != nil {
-		return nil, errors.Wrap(err, "decompress response")
-	}
-
-	var data prompb.ReadResponse
-	spanUnmarshal, ctx := tracing.StartSpan(ctx, "unmarshal_response")
-	if err := proto.Unmarshal(decomp, &data); err != nil {
-		return nil, errors.Wrap(err, "unmarshal response")
-	}
-	spanUnmarshal.Finish()
-	if len(data.Results) != 1 {
-		return nil, errors.Errorf("unexepected result size %d", len(data.Results))
-	}
-	return &data, nil
+	return presp, nil
 }
 
 func labelsMatches(lset labels.Labels, ms []storepb.LabelMatcher) (bool, []storepb.LabelMatcher, error) {

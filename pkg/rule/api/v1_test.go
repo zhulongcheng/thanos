@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/go-kit/kit/log"
 	qapi "github.com/improbable-eng/thanos/pkg/query/api"
 	thanosrule "github.com/improbable-eng/thanos/pkg/rule"
@@ -79,6 +81,7 @@ func (m rulesRetrieverMock) AlertingRules() []thanosrule.AlertingRule {
 		time.Second,
 		labels.Labels{},
 		labels.Labels{},
+		labels.Labels{},
 		true,
 		log.NewNopLogger(),
 	)
@@ -86,6 +89,7 @@ func (m rulesRetrieverMock) AlertingRules() []thanosrule.AlertingRule {
 		"test_metric4",
 		expr2,
 		time.Second,
+		labels.Labels{},
 		labels.Labels{},
 		labels.Labels{},
 		true,
@@ -125,6 +129,7 @@ func TestEndpoints(t *testing.T) {
 		algr.RuleGroups()
 		api := NewAPI(
 			nil,
+			prometheus.DefaultRegisterer,
 			algr,
 		)
 		testEndpoints(t, api)
